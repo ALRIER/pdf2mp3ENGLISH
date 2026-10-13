@@ -1,4 +1,4 @@
-name: CPU pipeline tests
+name: CPU pipeline validation
 on:
   push:
     branches: [main, modern-tts-v1]
@@ -7,12 +7,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m pip install --upgrade pip
-      - run: pip install pytest "pymupdf>=1.25,<2" "python-docx>=1.1,<2"
-      - run: pytest -q
+      - name: Install lightweight validation dependencies
+        run: pip install pytest "pymupdf>=1.25,<2" "python-docx>=1.1,<2"
+      - name: Compile application sources
+        run: python -m compileall -q app.py pipeline.py synthesis.py scripts
+      - name: Run CPU document pipeline tests
+        run: pytest -q
