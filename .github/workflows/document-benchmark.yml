@@ -1,4 +1,4 @@
-name: Journal and philosophy PDF tests
+name: Journal and philosophy PDF validation
 on:
   workflow_dispatch:
   push:
