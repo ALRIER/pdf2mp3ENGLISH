@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/benchmark_documents.py'
+      - 'layout.py'
+      - 'pipeline.py'
       - '.github/workflows/document-benchmark.yml'
 jobs:
   documents:
