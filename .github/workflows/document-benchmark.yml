@@ -1,0 +1,33 @@
+name: Journal and philosophy PDF tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/benchmark_documents.py'
+      - '.github/workflows/document-benchmark.yml'
+jobs:
+  documents:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install audio prerequisites
+        run: sudo apt-get update && sudo apt-get install -y espeak-ng libsndfile1
+      - name: Install model
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -r requirements.txt
+      - name: Extract two PDFs and narrate short excerpts
+        run: python scripts/benchmark_documents.py
+      - name: Upload safe previews, short WAV samples and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journal-philosophy-benchmark
+          path: artifacts/document-validation/
+          if-no-files-found: warn
+          retention-days: 14
