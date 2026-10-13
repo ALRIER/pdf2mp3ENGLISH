@@ -21,7 +21,7 @@ if file:
         st.success(f"Extracted {len(text):,} characters")
         edited = st.text_area("Review and edit text before narration", text, height=300)
         segments = split_text(edited)
-        st.caption(f"{len(segments)} synthesis chunks. Word highlighting requires a future alignment component.")
+        st.caption(f"{len(segments)} synthesis chunks. Word highlighting is available after audio generation.")
         if st.button("Generate WAV audio"):
             with st.spinner("Generating audio on CPU (first run downloads model weights)..."):
                 wav = synthesize_wav(edited, voice=voice, speed=speed)
@@ -30,7 +30,12 @@ if file:
             st.audio(wav, format="audio/wav")
             st.download_button("Download audiobook WAV", wav, file_name="audiobook.wav", mime="audio/wav")
     except Exception as exc:
-        st.error(f"Unable to process document: {exc}")
+        message = str(exc)
+        if "Hub" in message or "cache" in message or "Connection" in message or "huggingface" in message.lower():
+            st.error("The document was extracted, but the Kokoro model could not be loaded from Hugging Face. Check the server internet connection and model access, then retry. Once downloaded, the model is cached for subsequent uses on the same server.")
+            st.caption(f"Technical detail: {type(exc).__name__}: {message[:300]}")
+        else:
+            st.error(f"Unable to process document: {exc}")
 
 if 'audiobook_wav' in st.session_state:
     st.subheader('Synchronized reader (experimental)')
