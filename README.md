@@ -38,3 +38,9 @@ PDF/DOCX/TXT import; heuristic PDF table/header/footer skipping; manual text cor
 ## Security and limitations
 
 Do not upload confidential documents to a publicly deployed demo unless its hosting and data-retention policies meet your requirements. Public GitHub Actions logs/artifacts are unsuitable for private content. Do not commit PDF inputs, outputs, model files or credentials. Filtering and reading order are heuristic and should be reviewed before synthesizing. CPU inference speed depends on the machine.
+
+## Stage 4 — Synchronized reader prototype
+
+The Streamlit app now includes a browser-based karaoke-style player with auto-scrolling. Generate a short WAV, then click **Analyze word timings** to produce CPU speech-recognition timestamps. Install optional dependencies first: `pip install -r requirements-alignment.txt`. The frontend will use the **recognized transcript**, not guaranteed exact original text. This is an experimental timing prototype, **not verified forced alignment**. For exact source-text fidelity and robust word synchronization, a dedicated forced-alignment evaluation remains necessary.
+
+Deployment to Streamlit Community Cloud is a separate step requiring an authorized deployment and adequate CPU/RAM; merely pushing to GitHub does not deploy a live app. Note that installing only `requirements.txt` does not provide word timing.
