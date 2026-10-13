@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pymupdf
 from pipeline import extract_document, split_text
+from layout import extract_pdf_clean
 from synthesis import synthesize_wav
 
 CASES = [
@@ -39,6 +40,8 @@ for case in CASES:
         pdf.select(list(range(page_count)))
         sample_pdf = pdf.tobytes(garbage=3, deflate=True)
     started = time.perf_counter()
+    raw_text = "\\n".join(page.get_text() for page in pymupdf.open(stream=sample_pdf, filetype="pdf"))
+    _clean_blocks, audit = extract_pdf_clean(sample_pdf, skip_tables=True, skip_margins=True)
     clean = extract_document(sample_pdf, "document.pdf", skip_tables=True, skip_margins=True)
     extraction_seconds = time.perf_counter() - started
     snippet = " ".join(split_text(clean, 650)[:2])
@@ -54,6 +57,9 @@ for case in CASES:
         "total_pdf_pages": total_pages,
         "tested_pages": page_count,
         "extracted_chars": len(clean),
+        "raw_chars": len(raw_text),
+        "removed_chars_estimate": max(0, len(raw_text) - len(clean)),
+        "layout_audit": audit,
         "audio_input_chars": len(snippet),
         "audio_duration_seconds": round(info.duration, 2),
         "extraction_seconds": round(extraction_seconds, 2),
