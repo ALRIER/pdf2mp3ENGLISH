@@ -1,40 +1,40 @@
-# PDF to Audiobook — Neural TTS (v1 prototype)
+# Open Audiobook — CPU-first neural text-to-speech
 
-Modernization of the original `pdftomp3` Bash converter. The legacy implementation remains available, unmodified, in [pdftomp3](./pdftomp3) with its original copyright notice and licensing.
+Clean replacement for the original PDF-to-MP3 Bash script (recoverable from Git history). This is an open-source prototype, not a finished hosted service.
 
-## Capabilities
+## Architecture
 
-- Upload PDF, DOCX or TXT using Streamlit.
-- Skip PDF image blocks, automatically detected tables and optional top/bottom page margins.
-- Review extracted text before reading it.
-- Use the pretrained Kokoro-82M text-to-speech model (American English voices) on CPU.
-- Listen in the browser and download a WAV audiobook.
+- **GitHub:** application code, configuration, tests and CI. GitHub is not a permanent inference server.
+- **Hugging Face:** official pretrained weights, downloaded to local/runner cache (not stored in Git).
+- **Streamlit:** web interface; in the present prototype it also calls local inference. The inference component is isolated in `synthesis.py` so it can later move to a dedicated worker.
+- **Model:** [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), Apache 2.0, CPU-supported. Original model and authorship remain attributed.
 
-## Run locally
-
-Python 3.11 is recommended. `kokoro` can require additional operating-system dependencies on some systems.
+## Start (Ubuntu/Linux, Python 3.11)
 
 ```bash
-python -m venv .venv
+sudo apt-get update && sudo apt-get install -y espeak-ng libsndfile1
+python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python scripts/download_model.py
 streamlit run app.py
 ```
 
-Model weights are downloaded at runtime to the machine's model cache, **not committed to GitHub**. Ensure that you have reviewed the upstream model's license and that the host has adequate RAM. A WAV audiobook can be very large.
+On Windows, install eSpeak NG separately, then run equivalent venv commands with Python 3.11. The first model download needs an internet connection and disk space; subsequent runs reuse Hugging Face cache. Model weights are **not** committed to this repository.
 
-## Scope and known limitations
+## Current functionality
 
-**This is a prototype, not a production deployment.** Tables and headers are skipped heuristically and may be missed or over-filtered. Multi-column reading order may be incorrect. Image-based scanned PDFs require OCR, which is not implemented. EPUB, MP3 export, streaming chapters, and native multilingual support are not yet implemented. The default app uses American-English Kokoro voices.
+PDF/DOCX/TXT import; heuristic PDF table/header/footer skipping; manual text correction; neural English narration; WAV playback/download. The initial implementation loads complete audio in memory; use modest-sized test documents first.
 
-**Synchronized word highlighting is planned, not implemented.** It requires accurate word start/end timestamps derived by forced alignment or a TTS engine exposing word timing, followed by a synchronized browser player. Timing cannot be derived reliably from the text alone.
+## Planned, not yet delivered
 
-**GitHub Actions are not an always-on app host.** They can run tests and batch inference, but service deployments should use Streamlit hosting or local inference. Public Actions are visible; never submit private documents to public Actions jobs or commit them to this repository.
+- True document layout reasoning and reliable multi-column parsing
+- OCR for scanned PDFs
+- EPUB, chapter-based MP3/M4B export, asynchronous jobs, streaming
+- Forced alignment, word-by-word highlighting and auto-scroll
+- Fine-tuning/checkpoint workflows and performance benchmarks
+- External inference worker, persistent hosting and user isolation
 
-## Next milestones
+## Security and limitations
 
-1. Benchmark Kokoro vs Piper on CPU, measuring real-time factor, memory and quality.
-2. Improve document layout analysis and add chapter handling and EPUB.
-3. Add forced word alignment, synchronized text highlighting and auto-scroll.
-4. Add chapter-wise downloadable MP3 or M4B generation.
-5. Test Streamlit hosting performance and decide on a hybrid local/cloud architecture.
+Do not upload confidential documents to a publicly deployed demo unless its hosting and data-retention policies meet your requirements. Public GitHub Actions logs/artifacts are unsuitable for private content. Do not commit PDF inputs, outputs, model files or credentials. Filtering and reading order are heuristic and should be reviewed before synthesizing. CPU inference speed depends on the machine.
