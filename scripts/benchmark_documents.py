@@ -59,9 +59,9 @@ for case in CASES:
         "extraction_seconds": round(extraction_seconds, 2),
         "synthesis_seconds": round(synthesis_seconds, 2),
         "real_time_factor": round(synthesis_seconds / info.duration, 3),
-        "suspected_page_markers": len(re.findall(r"(?mi)^\\s*page\\s+\\d+\\s*$", clean)),
-        "table_heading_mentions": len(re.findall(r"(?i)\\btable\\s+\\d+", clean)),
-        "figure_heading_mentions": len(re.findall(r"(?i)\\bfig(?:ure|\\.)?\\s+\\d+", clean)),
+        "suspected_page_markers": len(re.findall(r"(?mi)^\s*page\s+\d+\s*$", clean)),
+        "table_heading_mentions": len(re.findall(r"(?i)\btable\s+\d+", clean)),
+        "figure_heading_mentions": len(re.findall(r"(?i)\bfig(?:ure|\.)?\s+\d+", clean)),
     }
     if len(clean) < 600 or info.duration < 3:
         raise ValueError(f"Unusable extraction or speech for {case['id']}")
