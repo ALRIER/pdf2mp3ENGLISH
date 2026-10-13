@@ -1,6 +1,7 @@
-"""CPU-compatible Kokoro synthesis; weights are downloaded at runtime."""
+"""CPU-compatible Kokoro synthesis with process-level model reuse."""
 from __future__ import annotations
 
+from functools import lru_cache
 from io import BytesIO
 
 import numpy as np
@@ -9,13 +10,18 @@ import soundfile as sf
 from pipeline import split_text
 
 SAMPLE_RATE = 24_000
+MODEL_ID = "hexgrad/Kokoro-82M"
+
+
+@lru_cache(maxsize=1)
+def get_pipeline():
+    """Load once per Python process; Hugging Face caches downloaded weights on disk."""
+    from kokoro import KPipeline
+    return KPipeline(lang_code="a", repo_id=MODEL_ID, device="cpu")
 
 
 def synthesize_wav(text: str, voice: str = "af_heart", speed: float = 1.0) -> bytes:
-    # Import lazily so text extraction and the interface work without model weights.
-    from kokoro import KPipeline
-
-    pipeline = KPipeline(lang_code="a")
+    pipeline = get_pipeline()
     pieces = []
     for chunk in split_text(text):
         for _, _, audio in pipeline(chunk, voice=voice, speed=speed, split_pattern=r"\n+"):
