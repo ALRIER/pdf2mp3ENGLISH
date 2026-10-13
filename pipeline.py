@@ -26,27 +26,10 @@ def extract_document(data: bytes, name: str, skip_tables: bool = True,
     suffix = name.lower().rsplit(".", 1)[-1]
     sections: list[str] = []
     if suffix == "pdf":
-        with pymupdf.open(stream=data, filetype="pdf") as doc:
-            for page in doc:
-                # Text-only extraction: images are not read or OCR'd.
-                table_rects = []
-                if skip_tables:
-                    try:
-                        table_rects = [pymupdf.Rect(t.bbox) for t in page.find_tables().tables]
-                    except Exception:
-                        pass  # Table detection can fail on malformed PDFs.
-                blocks = page.get_text("blocks", sort=True)
-                for block in blocks:
-                    if len(block) < 7 or block[6] != 0:
-                        continue
-                    rect = pymupdf.Rect(block[:4])
-                    if skip_margins and (rect.y1 < 0.07 * page.rect.height or
-                                         rect.y0 > 0.93 * page.rect.height):
-                        continue
-                    if skip_tables and any((rect & r).get_area() > 0.2 * rect.get_area()
-                                           for r in table_rects if rect.get_area() > 0):
-                        continue
-                    sections.append(block[4])
+        from layout import extract_pdf_clean
+        extracted, _audit = extract_pdf_clean(
+            data, skip_tables=skip_tables, skip_margins=skip_margins)
+        sections = [extracted]
     elif suffix == "docx":
         doc = Document(BytesIO(data))
         sections = [p.text for p in doc.paragraphs if p.text.strip()]
