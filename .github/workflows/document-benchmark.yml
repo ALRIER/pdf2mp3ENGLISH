@@ -22,7 +22,7 @@ jobs:
           pip install --index-url https://download.pytorch.org/whl/cpu torch
           pip install -r requirements.txt
       - name: Extract two PDFs and narrate short excerpts
-        run: python scripts/benchmark_documents.py
+        run: python -m scripts.benchmark_documents
       - name: Upload safe previews, short WAV samples and metrics
         if: always()
         uses: actions/upload-artifact@v4
