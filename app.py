@@ -3,6 +3,7 @@ import streamlit as st
 
 from pipeline import extract_document, split_text
 from synthesis import synthesize_wav
+from reader import show_reader
 
 st.set_page_config(page_title="PDF to Audiobook", page_icon="🎧")
 st.title("PDF to Audiobook — Neural TTS")
@@ -24,7 +25,22 @@ if file:
         if st.button("Generate WAV audio"):
             with st.spinner("Generating audio on CPU (first run downloads model weights)..."):
                 wav = synthesize_wav(edited, voice=voice, speed=speed)
+            st.session_state['audiobook_wav'] = wav
+            st.session_state.pop('audiobook_words', None)
             st.audio(wav, format="audio/wav")
             st.download_button("Download audiobook WAV", wav, file_name="audiobook.wav", mime="audio/wav")
     except Exception as exc:
         st.error(f"Unable to process document: {exc}")
+
+if 'audiobook_wav' in st.session_state:
+    st.subheader('Synchronized reader (experimental)')
+    st.caption('Word times come from CPU speech recognition, so the highlighted transcript may differ from original text.')
+    if st.button('Analyze word timings'):
+        try:
+            from alignment import recognize_word_timestamps
+            with st.spinner('Extracting word timestamps on CPU...'):
+                st.session_state['audiobook_words'] = recognize_word_timestamps(st.session_state['audiobook_wav'])
+        except Exception as exc:
+            st.error(f'Alignment failed: {exc}')
+    if st.session_state.get('audiobook_words'):
+        show_reader(st.session_state['audiobook_wav'], st.session_state['audiobook_words'])
