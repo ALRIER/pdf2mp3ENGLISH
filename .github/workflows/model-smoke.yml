@@ -1,6 +1,12 @@
-name: Download and smoke-test Kokoro on CPU
+name: Kokoro CPU smoke and benchmark
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/benchmark_cpu.py'
+      - '.github/workflows/model-smoke.yml'
+      - 'requirements.txt'
 jobs:
   kokoro-cpu:
     runs-on: ubuntu-latest
@@ -12,7 +18,17 @@ jobs:
           python-version: '3.11'
       - name: Install eSpeak NG and audio dependencies
         run: sudo apt-get update && sudo apt-get install -y espeak-ng libsndfile1
-      - name: Install model and application dependencies
-        run: pip install -r requirements.txt
-      - name: Download weights from Hugging Face and synthesize a sample
-        run: python scripts/download_model.py
+      - name: Install CPU PyTorch and application dependencies
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -r requirements.txt
+      - name: CPU model download and audio benchmark
+        run: python scripts/benchmark_cpu.py
+      - name: Upload metrics and audio sample
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kokoro-cpu-smoke
+          path: artifacts/cpu-smoke/
+          if-no-files-found: warn
+          retention-days: 14
