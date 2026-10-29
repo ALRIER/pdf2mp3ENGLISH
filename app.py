@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hashlib
 
+from audiobook_package import package_audiobook
+
 import streamlit as st
 
 from pipeline import extract_document, split_text
@@ -37,6 +39,7 @@ if file:
             st.session_state["document_id"] = document_id
             st.session_state.pop("audiobook_wav", None)
             st.session_state.pop("audiobook_words", None)
+            st.session_state.pop("audio_document_id", None)
 
         with st.spinner("Reading document..."):
             text = cached_extract_document(
@@ -44,20 +47,29 @@ if file:
             )
 
         st.success(f"Extracted {len(text):,} characters")
-        edited = st.text_area("Review and edit text before narration", text, height=300)
+        edited = st.text_area("Review and edit text before narration", text, height=300, key=f"edited_{document_id}_{skip_tables}_{skip_margins}")
         segments = split_text(edited)
         st.caption(f"{len(segments)} synthesis chunks. Word highlighting is available after audio generation.")
 
-        if st.button("Generate WAV audio"):
-            with st.spinner("Generating audio on CPU (first run may load model weights)..."):
+        generation_id = hashlib.sha256(
+            repr((document_id, edited, voice, speed)).encode("utf-8")
+        ).hexdigest()
+        if st.button("Generate WAV audio", type="primary"):
+            st.info("Audio generation started. The player and downloads will appear when it finishes.")
+            with st.status("Generating narration...", expanded=True) as status:
+                st.write("Loading voice model and synthesizing text on CPU.")
                 wav = synthesize_wav(edited, voice=voice, speed=speed)
-            st.session_state["audiobook_wav"] = wav
-            st.session_state["audio_document_id"] = document_id
-            st.session_state.pop("audiobook_words", None)
+                st.session_state["audiobook_wav"] = wav
+                st.session_state["audio_document_id"] = document_id
+                st.session_state["audio_generation_id"] = generation_id
+                st.session_state.pop("audiobook_words", None)
+                status.update(label="Narration ready", state="complete", expanded=False)
+            st.success("Audio is ready. Play it below or download the package.")
 
         if (
             st.session_state.get("audiobook_wav")
             and st.session_state.get("audio_document_id") == document_id
+            and st.session_state.get("audio_generation_id") == generation_id
         ):
             wav = st.session_state["audiobook_wav"]
             st.audio(wav, format="audio/wav")
@@ -67,6 +79,14 @@ if file:
                 file_name="audiobook.wav",
                 mime="audio/wav",
             )
+            st.download_button(
+                "Download document + audio (ZIP)",
+                package_audiobook(file.name, data, wav),
+                file_name=f"{file.name.rsplit('.', 1)[0]}_audiobook.zip",
+                mime="application/zip",
+            )
+        elif st.session_state.get("audiobook_wav"):
+            st.info("Document, text, or voice settings changed. Generate audio again to match the current version.")
     except Exception as exc:
         message = str(exc)
         if "Hub" in message or "cache" in message or "Connection" in message or "huggingface" in message.lower():
