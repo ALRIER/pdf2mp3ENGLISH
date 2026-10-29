@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install lightweight validation dependencies
-        run: pip install pytest "pymupdf>=1.25,<2" "python-docx>=1.1,<2"
+        run: pip install pytest "pymupdf>=1.25,<2" "python-docx>=1.1,<2" "numpy>=1.26,<3" "soundfile>=0.13,<1"
       - name: Compile application sources
         run: python -m compileall -q app.py pipeline.py synthesis.py scripts
       - name: Run CPU document pipeline tests
