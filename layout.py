@@ -26,27 +26,49 @@ def _is_caption(value: str) -> bool:
 
 
 def _column_order(blocks: list[tuple], width: float) -> list[tuple]:
-    """Recognize clearly disjoint two-column body blocks; otherwise sort top-down.
+    """Return a narration-friendly reading order for common two-column pages.
 
-    Full-width blocks precede same-level columns. Ambiguous pages use native sort.
+    Blocks are classified by geometry rather than exact midpoint boundaries. This
+    avoids interleaving left/right columns when blocks slightly cross the page
+    midpoint because of indentation, equations, or extraction noise.
     """
     if len(blocks) < 4:
         return sorted(blocks, key=lambda b: (b[1], b[0]))
+
     mid = width / 2
-    left = [b for b in blocks if b[2] < mid * 1.07 and b[0] < mid]
-    right = [b for b in blocks if b[0] > mid * 0.93]
-    narrow = left + right
-    if len(left) < 2 or len(right) < 2 or len(narrow) < len(blocks) * .65:
+    max_column_width = width * 0.58
+
+    def block_width(b: tuple) -> float:
+        return max(0.0, b[2] - b[0])
+
+    narrow = [b for b in blocks if block_width(b) <= max_column_width]
+    left = [b for b in narrow if (b[0] + b[2]) / 2 < mid]
+    right = [b for b in narrow if (b[0] + b[2]) / 2 >= mid]
+
+    # Require clear evidence of two columns; otherwise preserve ordinary page flow.
+    if len(left) < 2 or len(right) < 2 or len(narrow) < len(blocks) * 0.55:
         return sorted(blocks, key=lambda b: (b[1], b[0]))
+
     first_column_y = min(b[1] for b in narrow)
-    top = [b for b in blocks if b not in narrow and b[3] <= first_column_y + 3]
-    rest = [b for b in blocks if b not in narrow and b not in top]
-    # Wide blocks in the middle of column flow are ambiguous: fail back safely.
-    if rest:
+    last_column_y = max(b[3] for b in narrow)
+    wide = [b for b in blocks if b not in narrow]
+
+    # Full-width title/abstract blocks above the columns are safe to keep first.
+    top = [b for b in wide if b[3] <= first_column_y + 6]
+    bottom = [b for b in wide if b[1] >= last_column_y - 6]
+    middle = [b for b in wide if b not in top and b not in bottom]
+
+    # A full-width block inside the column region is ambiguous (e.g. a large
+    # equation/table). Fall back rather than inventing a reading order.
+    if middle:
         return sorted(blocks, key=lambda b: (b[1], b[0]))
-    return (sorted(top, key=lambda b: b[1])
-            + sorted(left, key=lambda b: b[1])
-            + sorted(right, key=lambda b: b[1]))
+
+    return (
+        sorted(top, key=lambda b: (b[1], b[0]))
+        + sorted(left, key=lambda b: (b[1], b[0]))
+        + sorted(right, key=lambda b: (b[1], b[0]))
+        + sorted(bottom, key=lambda b: (b[1], b[0]))
+    )
 
 
 def extract_pdf_clean(data: bytes, skip_tables: bool = True,
@@ -98,7 +120,6 @@ def extract_pdf_clean(data: bytes, skip_tables: bool = True,
                     chosen.append(b)
             for b in _column_order(chosen, page.rect.width):
                 retained.append(b[4].strip())
-    # Preserve an explicit line break between blocks; normalization happens upstream.
     text = "\n\n".join(retained)
     audit = {"pages": len(pages), "retained_blocks": len(retained),
              "removed_blocks": len(removals),
