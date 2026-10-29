@@ -1,4 +1,8 @@
 """Streamlit front-end for a CPU-first audiobook prototype."""
+from __future__ import annotations
+
+import hashlib
+
 import streamlit as st
 
 from pipeline import extract_document, split_text
@@ -9,6 +13,14 @@ st.set_page_config(page_title="PDF to Audiobook", page_icon="🎧")
 st.title("PDF to Audiobook — Neural TTS")
 st.caption("CPU-first prototype. Uploaded files are processed in memory; do not upload private documents to a public hosted app.")
 
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def cached_extract_document(data: bytes, name: str, skip_tables: bool,
+                            skip_margins: bool) -> str:
+    """Avoid re-parsing an unchanged upload on every Streamlit rerun."""
+    return extract_document(data, name, skip_tables, skip_margins)
+
+
 file = st.file_uploader("Choose a document", type=["pdf", "docx", "txt"])
 skip_tables = st.checkbox("Skip detected PDF tables", value=True)
 skip_margins = st.checkbox("Skip PDF header/footer margins", value=True)
@@ -17,18 +29,44 @@ speed = st.slider("Speech speed", 0.75, 1.5, 1.0, 0.05)
 
 if file:
     try:
-        text = extract_document(file.getvalue(), file.name, skip_tables, skip_margins)
+        data = file.getvalue()
+        document_id = hashlib.sha256(data).hexdigest()
+
+        # Never let audio/timings from a previous upload leak into a new document.
+        if st.session_state.get("document_id") != document_id:
+            st.session_state["document_id"] = document_id
+            st.session_state.pop("audiobook_wav", None)
+            st.session_state.pop("audiobook_words", None)
+
+        with st.spinner("Reading document..."):
+            text = cached_extract_document(
+                data, file.name, skip_tables, skip_margins
+            )
+
         st.success(f"Extracted {len(text):,} characters")
         edited = st.text_area("Review and edit text before narration", text, height=300)
         segments = split_text(edited)
         st.caption(f"{len(segments)} synthesis chunks. Word highlighting is available after audio generation.")
+
         if st.button("Generate WAV audio"):
-            with st.spinner("Generating audio on CPU (first run downloads model weights)..."):
+            with st.spinner("Generating audio on CPU (first run may load model weights)..."):
                 wav = synthesize_wav(edited, voice=voice, speed=speed)
-            st.session_state['audiobook_wav'] = wav
-            st.session_state.pop('audiobook_words', None)
+            st.session_state["audiobook_wav"] = wav
+            st.session_state["audio_document_id"] = document_id
+            st.session_state.pop("audiobook_words", None)
+
+        if (
+            st.session_state.get("audiobook_wav")
+            and st.session_state.get("audio_document_id") == document_id
+        ):
+            wav = st.session_state["audiobook_wav"]
             st.audio(wav, format="audio/wav")
-            st.download_button("Download audiobook WAV", wav, file_name="audiobook.wav", mime="audio/wav")
+            st.download_button(
+                "Download audiobook WAV",
+                wav,
+                file_name="audiobook.wav",
+                mime="audio/wav",
+            )
     except Exception as exc:
         message = str(exc)
         if "Hub" in message or "cache" in message or "Connection" in message or "huggingface" in message.lower():
@@ -37,15 +75,24 @@ if file:
         else:
             st.error(f"Unable to process document: {exc}")
 
-if 'audiobook_wav' in st.session_state:
-    st.subheader('Synchronized reader (experimental)')
-    st.caption('Word times come from CPU speech recognition, so the highlighted transcript may differ from original text.')
-    if st.button('Analyze word timings'):
+if (
+    file
+    and st.session_state.get("audiobook_wav")
+    and st.session_state.get("audio_document_id") == st.session_state.get("document_id")
+):
+    st.subheader("Synchronized reader (experimental)")
+    st.caption("Word times come from CPU speech recognition, so the highlighted transcript may differ from original text.")
+    if st.button("Analyze word timings"):
         try:
             from alignment import recognize_word_timestamps
-            with st.spinner('Extracting word timestamps on CPU...'):
-                st.session_state['audiobook_words'] = recognize_word_timestamps(st.session_state['audiobook_wav'])
+            with st.spinner("Extracting word timestamps on CPU..."):
+                st.session_state["audiobook_words"] = recognize_word_timestamps(
+                    st.session_state["audiobook_wav"]
+                )
         except Exception as exc:
-            st.error(f'Alignment failed: {exc}')
-    if st.session_state.get('audiobook_words'):
-        show_reader(st.session_state['audiobook_wav'], st.session_state['audiobook_words'])
+            st.error(f"Alignment failed: {exc}")
+    if st.session_state.get("audiobook_words"):
+        show_reader(
+            st.session_state["audiobook_wav"],
+            st.session_state["audiobook_words"],
+        )
