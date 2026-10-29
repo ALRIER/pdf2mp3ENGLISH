@@ -14,6 +14,29 @@ def test_column_order():
         "left first", "left second", "right first", "right second"]
 
 
+def test_column_order_tolerates_midpoint_overlap():
+    blocks = [
+        (38, 100, 305, 130, "left first", 0, 0),
+        (38, 170, 304, 200, "left second", 0, 0),
+        (294, 100, 556, 130, "right first", 0, 0),
+        (295, 170, 556, 200, "right second", 0, 0),
+    ]
+    assert [b[4] for b in _column_order(blocks, 580)] == [
+        "left first", "left second", "right first", "right second"]
+
+
+def test_full_width_heading_precedes_columns():
+    blocks = [
+        (40, 30, 540, 65, "Article title", 0, 0),
+        (40, 100, 270, 130, "left first", 0, 0),
+        (40, 170, 270, 200, "left second", 0, 0),
+        (310, 100, 540, 130, "right first", 0, 0),
+        (310, 170, 540, 200, "right second", 0, 0),
+    ]
+    assert [b[4] for b in _column_order(blocks, 580)] == [
+        "Article title", "left first", "left second", "right first", "right second"]
+
+
 def test_repeated_headers_and_numbers():
     doc = pymupdf.open()
     for i in range(4):
