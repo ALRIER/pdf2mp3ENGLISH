@@ -57,8 +57,17 @@ if file:
         if st.button("Generate WAV audio", type="primary"):
             st.info("Audio generation started. The player and downloads will appear when it finishes.")
             with st.status("Generating narration...", expanded=True) as status:
-                st.write("Loading voice model and synthesizing text on CPU.")
-                wav = synthesize_wav(edited, voice=voice, speed=speed)
+                st.write("Loading the voice model (this step cannot report percentage).")
+                progress = st.progress(0, text="Preparing model...")
+                def report_progress(completed: int, total: int) -> None:
+                    progress.progress(
+                        completed / total,
+                        text=f"Narrating section {completed} of {total} ({completed / total:.0%})",
+                    )
+                wav = synthesize_wav(
+                    edited, voice=voice, speed=speed, on_progress=report_progress
+                )
+                progress.progress(1.0, text="Audio generation complete.")
                 st.session_state["audiobook_wav"] = wav
                 st.session_state["audio_document_id"] = document_id
                 st.session_state["audio_generation_id"] = generation_id
